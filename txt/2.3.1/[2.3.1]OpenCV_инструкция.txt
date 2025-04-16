@@ -1,0 +1,19 @@
+Инструкция по установке OpenCV
+Установите Python. ВАЖНО! При установке Python обязательно должна быть поставлена галка в поле Add Python to PATH
+
+Установите Visual Studio Code
+В терминале Visual Studio Code пропишите команду
+Для Windows
+pip install opencv-python
+
+Для МакОС:
+brew install opencv3 --with-contrib --with-python3
+
+Для Linux:
+sudo apt-get install libopencv-dev python-opencv
+
+Проверьте установку OpenCV. Для этого введите в команду:
+import cv2
+После успешной установки в терминале появится уведомление о версии установленной библиотеки OpenCV
+
+Документация по работе с OpenCV размещена по ссылке https://docs.opencv.org/4.x/

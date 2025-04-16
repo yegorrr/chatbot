@@ -1,0 +1,41 @@
+Инструкция, в которой находятся фотография для кода в формате PNG и код.
+Фотография в формате PNG:
+
+Код для построения трехмерного графика цветового рассеивания:
+import cv2
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib import colors
+tiger = cv2.imread('tiger1.png')
+tiger = cv2.cvtColor(tiger, cv2.COLOR_BGR2RGB)
+hsv_tiger = cv2.cvtColor(tiger, cv2.COLOR_RGB2HSV)
+h, s, v = cv2.split(hsv_tiger)
+fig = plt.figure()
+axis = fig.add_subplot(1, 1, 1, projection="3d")
+pixel_colors = tiger.reshape((np.shape(tiger)[0]*np.shape(tiger)[1], 3))
+norm = colors.Normalize(vmin=-1.,vmax=1.)
+norm.autoscale(pixel_colors)
+pixel_colors = norm(pixel_colors).tolist()
+axis.scatter(h.flatten(), s.flatten(), v.flatten(), facecolors=pixel_colors, marker=".")
+axis.set_xlabel("Hue")
+axis.set_ylabel("Saturation")
+axis.set_zlabel("Value")
+plt.show()
+Код для установления порогов и маскирование изображения:
+import cv2
+import matplotlib.pyplot as plt
+
+tiger = cv2.imread('tiger1.png')
+tiger = cv2.cvtColor(tiger, cv2.COLOR_BGR2RGB)
+hsv_tiger = cv2.cvtColor(tiger, cv2.COLOR_RGB2HSV)
+
+light_orange = (11, 80, 0)
+dark_orange = (19, 255, 255)
+light_white = (1, 0, 0)
+dark_white = (175, 7, 255)
+mask_orange = cv2.inRange(hsv_tiger, light_orange, dark_orange)
+mask_white = cv2.inRange(hsv_tiger, light_white, dark_white)
+final_mask = mask_orange + mask_white
+final_result = cv2.bitwise_and(tiger, tiger, mask=final_mask)
+plt.imshow(final_result)
+plt.show()

@@ -1,0 +1,13 @@
+{
+"name" : "Computer_vision",
+"preview": "Icon.png",
+
+"effects" : [
+{
+"name": "facemodel",
+"texture": "Textures/komp.png",
+"eyes": false,
+"mouth": false
+}
+]
+}

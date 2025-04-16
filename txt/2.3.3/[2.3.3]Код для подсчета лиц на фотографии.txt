@@ -1,0 +1,11 @@
+Код для подсчета лиц на фотографии.
+
+import cv2
+img = cv2.imread('image.png')
+gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5)
+num_people = len(faces)
+print("Количество человек: ", num_people)
+
+В 4 строке знак “\” не предусмотрен, поскольку в программе строка войдет полностью.

@@ -1,0 +1,14 @@
+Код для mask.json
+{
+"name" : "Fruit",
+"preview": "Icon.png",
+
+"effects" : [
+{
+"name": "facemodel",
+"texture": "Textures/orange.png",
+"eyes": false,
+"mouth": false
+}
+]
+}

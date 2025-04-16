@@ -1,0 +1,15 @@
+﻿rag_mvp/
+├── app.py                 # Main Flask application, routes, background tasks
+├── config.py              # All configuration settings
+├── utils.py               # General utility functions (text cleaning, file handling)
+├── rag_core.py            # Core RAG logic (loading, indexing, searching)
+├── llm_interface.py       # Functions interacting with Gemini
+├── templates/
+│   └── upload.html        # Your existing upload page template
+├── prompts/
+│   ├── system_filter_prompt.txt  # Prompt for the query filtering LLM
+│   └── final_answer_prompt.txt   # Prompt for the final answer generation
+├── lessons/               # Source material directory (as before)
+├── txt/                   # Processed text files (as before)
+├── embeddings/            # Processed embeddings (as before)
+└── requirements.txt       # Python dependencies
