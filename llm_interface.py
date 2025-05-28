@@ -1,8 +1,7 @@
 # llm_interface.py
 import json
-import google.generativeai as genai
-# Импорт Exception DeadlineExceeded для отдельной обработки
-from google.api_core import exceptions as google_exceptions
+import openai
+import httpx # Для обработки таймаутов
 
 import config
 from utils import clean_text, load_prompt_template, tokenize
@@ -12,11 +11,14 @@ SYSTEM_FILTER_PROMPT = load_prompt_template(config.SYSTEM_FILTER_PROMPT_FILE)
 FINAL_ANSWER_PROMPT_TEMPLATE = load_prompt_template(config.FINAL_ANSWER_PROMPT_FILE)
 
 # --- Настройка Google AI ---
-try:
-    genai.configure(api_key=config.GEMINI_API_KEY)
-    print("--- Google AI SDK configured via llm_interface. ---")
-except Exception as e:
-    print(f"!!! FATAL ERROR configuring Google AI SDK in llm_interface: {e} !!!")
+# --- Настройка OpenAI (OpenRouter) ---
+# Используем httpx.Timeout для настройки таймаутов
+client = openai.OpenAI(
+    base_url="https://openrouter.ai/api/v1",
+    api_key=config.OPENROUTER_API_KEY,
+    http_client=httpx.Client(timeout=httpx.Timeout(60.0, connect=5.0)), # Общий таймаут 60с, таймаут подключения 5с
+)
+print("--- OpenAI SDK configured for OpenRouter via llm_interface. ---")
 
 # --- Функции взаимодействия с LLM ---
 def filter_query_with_llm_v2(user_question: str) -> dict:
@@ -25,38 +27,26 @@ def filter_query_with_llm_v2(user_question: str) -> dict:
     Включает резервную логику и обработку таймаута.
     """
     print(f"  Filtering query with LLM ({config.LLM_MODEL_NAME}): '{user_question[:60]}...'")
-    if not config.GEMINI_API_KEY or "YOUR_API_KEY" in config.GEMINI_API_KEY or ("AIzaSy" not in config.GEMINI_API_KEY):
+    if not config.OPENROUTER_API_KEY or "YOUR_OPENROUTER_API_KEY" in config.OPENROUTER_API_KEY:
          return { "confirmation": f"Ошибка конфигурации AI. Ищу: '{user_question[:50]}...'", "semantic_query": user_question, "bm25_keywords": tokenize(user_question)[:5] }
 
     if "ERROR:" in SYSTEM_FILTER_PROMPT:  # Проверка: шаблон системы не загружен
          print(f"  ERROR: Cannot filter query, system prompt failed to load.")
          return { "confirmation": f"Ошибка загрузки системной инструкции AI. Ищу: '{user_question[:50]}...'", "semantic_query": user_question, "bm25_keywords": tokenize(user_question)[:5] }
 
-    model = genai.GenerativeModel(config.LLM_MODEL_NAME)
     full_prompt = clean_text(SYSTEM_FILTER_PROMPT + "\nЗапрос пользователя: " + user_question)
     response = None
     content = ""
-
     try:
-        # --- ДОБАВЛЯЕМ ТАЙМАУТ ЗДЕСЬ ---
-        request_options = {"timeout": 30}  # Таймаут в секундах (например, 30 секунд для фильтрации)
-        response = model.generate_content(
-            full_prompt,
-            generation_config=config.generation_config,
-            request_options=request_options  # Передаем параметр таймаута
+        response = client.chat.completions.create(
+            model=config.LLM_MODEL_NAME,
+            messages=[
+                {"role": "user", "content": full_prompt}
+            ],
+            temperature=config.generation_config["temperature"],
+            max_tokens=2000, # Ограничение токенов для фильтрации
         )
-        try:
-            content = response.text.strip()
-        except ValueError:
-            finish_reason = getattr(getattr(response, 'prompt_feedback', None), 'block_reason', 'UNKNOWN')
-            print(f"    WARNING: Could not access filter response text. Blocked? Reason: {finish_reason}")
-            content = ""
-            # Определяем, нужно ли генерировать ошибку для конкретных причин блокировки
-            if finish_reason == 'SAFETY':
-                raise ValueError(f"Filter response blocked: {finish_reason}")
-        except Exception as resp_err:
-            print(f"    ERROR accessing filter response text: {resp_err}")
-            content = ""
+        content = response.choices[0].message.content.strip()
         if not content:
             raise ValueError("LLM filter response was empty.")
 
@@ -84,11 +74,18 @@ def filter_query_with_llm_v2(user_question: str) -> dict:
         return parsed_json
 
     # --- ОБРАБОТКА ОШИБКИ: таймаут ---
-    except google_exceptions.DeadlineExceeded as e:
+    except httpx.TimeoutException as e:
         print(f"  ERROR: Timeout during filter_query_with_llm_v2: {e}")
         # Резервная логика
         return {
             "confirmation": f"Ошибка сети (таймаут) при обработке ИИ. Ищу по тексту: '{user_question[:50]}...'",
+            "semantic_query": user_question,
+            "bm25_keywords": tokenize(user_question)[:5]
+        }
+    except openai.APIError as e:
+        print(f"  ERROR during filter_query_with_llm_v2 (OpenAI API Error): {e}")
+        return {
+            "confirmation": f"Произошла ошибка API при обработке запроса ИИ ({type(e).__name__}). Ищу по тексту: '{user_question[:50]}...'",
             "semantic_query": user_question,
             "bm25_keywords": tokenize(user_question)[:5]
         }
@@ -122,55 +119,37 @@ def generate_final_answer(user_question, combined_chunks_str):
 
     # --- Вызов LLM ---
     try:
-        if not config.GEMINI_API_KEY or "YOUR_API_KEY" in config.GEMINI_API_KEY or ("AIzaSy" not in config.GEMINI_API_KEY):
+        if not config.OPENROUTER_API_KEY or "YOUR_OPENROUTER_API_KEY" in config.OPENROUTER_API_KEY:
              return "Ошибка: Ключ API для генерации ответа не настроен."
 
-        model = genai.GenerativeModel(config.LLM_MODEL_NAME)
         cleaned_prompt = clean_text(prompt)
 
-        # --- ДОБАВЛЯЕМ ТАЙМАУТ ЗДЕСЬ ---
-        request_options = {"timeout": 90}  # Более длительный таймаут для генерации (например, 90 секунд)
-        response = model.generate_content(
-            cleaned_prompt,
-            generation_config=config.generation_config,
-            request_options=request_options  # Передача параметра таймаута
+        response = client.chat.completions.create(
+            model=config.LLM_MODEL_NAME,
+            messages=[
+                {"role": "user", "content": cleaned_prompt}
+            ],
+            temperature=config.generation_config["temperature"],
+            max_tokens=1500, # Увеличиваем токены для генерации ответа
         )
 
-        final_text = ""
-        try:
-            final_text = response.text.strip()
-            if not final_text:
-                finish_reason = "Unknown"
-                try:
-                    finish_reason = response.candidates[0].finish_reason.name
-                except (AttributeError, IndexError):
-                    pass
-                print(f"    WARNING: LLM final answer response content is empty. Finish Reason: {finish_reason}")
-                if finish_reason == 'SAFETY':
-                    final_text = f"Не удалось сгенерировать ответ из-за настроек безопасности контента."
-                elif finish_reason == 'RECITATION':
-                    final_text = f"Не удалось сгенерировать ответ из-за политики цитирования."
-                else:
-                    final_text = f"Не удалось сгенерировать ответ (пустой ответ от модели, причина: {finish_reason})."
-        except ValueError as ve:  # Проверка блокировки ответа
-             block_reason = "Unknown"
-             try:
-                 block_reason = response.prompt_feedback.block_reason.name
-             except AttributeError:
-                 pass
-             print(f"    WARNING: LLM final answer response blocked or empty. Reason: {block_reason}")
-             final_text = f"Не удалось сгенерировать ответ (заблокировано: {block_reason}). Попробуйте переформулировать."
-        except Exception as resp_err:
-             print(f"    ERROR accessing LLM final answer response content: {resp_err}")
-             final_text = "Ошибка получения текста ответа от языковой модели."
+        final_text = response.choices[0].message.content.strip()
+        if not final_text:
+            # OpenAI API обычно не возвращает пустой content, если нет ошибок.
+            # Если это произошло, это может быть внутренняя проблема или очень короткий ответ.
+            print(f"    WARNING: LLM final answer response content is empty.")
+            final_text = f"Не удалось сгенерировать ответ (пустой ответ от модели)."
 
         print("  Final answer received from LLM.")
         return final_text
 
     # --- ОБРАБОТКА ОШИБКИ: таймаут ---
-    except google_exceptions.DeadlineExceeded as e:
+    except httpx.TimeoutException as e:
         print(f"  ERROR: Timeout during final answer generation call to LLM: {e}")
         return "Произошла ошибка: превышено время ожидания ответа от языковой модели при генерации ответа."
+    except openai.APIError as e:
+        print(f"  ERROR during final answer generation call to LLM (OpenAI API Error): {e}")
+        return f"Произошла ошибка API ({type(e).__name__}) при генерации финального ответа. Пожалуйста, попробуйте позже."
     except Exception as e:
         print(f"  ERROR during final answer generation call to LLM: {type(e).__name__}: {e}")
         return f"Произошла внутренняя ошибка ({type(e).__name__}) при генерации финального ответа. Пожалуйста, попробуйте позже."

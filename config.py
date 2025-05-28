@@ -10,18 +10,16 @@ load_dotenv()
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 
 # --- API ключи и модели ---
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "YOUR_API_KEY_PLACEHOLDER")  # ИЗМЕНИТЕ ЭТО или задайте переменную окружения
-if not GEMINI_API_KEY or "YOUR_API_KEY" in GEMINI_API_KEY or ("AIzaSy" not in GEMINI_API_KEY):
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "insert OPENROUTER_API_KEY")
+if not OPENROUTER_API_KEY or "YOUR_OPENROUTER_API_KEY" in OPENROUTER_API_KEY:
     print("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-    print("!!! ВНИМАНИЕ: API ключ Gemini отсутствует или недействителен.  !!!")
-    print("!!! Пожалуйста, задайте переменную окружения GEMINI_API_KEY   !!!")
+    print("!!! ВНИМАНИЕ: API ключ OpenRouter отсутствует или недействителен. !!!")
+    print("!!! Пожалуйста, задайте переменную окружения OPENROUTER_API_KEY !!!")
     print("!!! или обновите значение по умолчанию в config.py.            !!!")
     print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n")
-    # Можно рассмотреть вариант вызова ошибки, если ключ обязателен:
-    # raise ValueError("Gemini API Key is missing or invalid.")
 
 EMBEDDING_MODEL_NAME = "DeepPavlov/rubert-base-cased-sentence"
-LLM_MODEL_NAME = "gemini-2.0-flash"  # Или выбранная вами модель
+LLM_MODEL_NAME = "google/gemini-2.5-flash-preview-05-20"
 
 # --- Настройка прокси ---
 # Укажите URL прокси здесь через переменную окружения или жестко закодированное значение
